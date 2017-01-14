@@ -5,21 +5,184 @@ output:
     keep_md: true
 ---
 
+## Package loading
+
+```{r package, echo=TRUE}
+
+# load plotting package
+library(lattice)
+
+```
 
 ## Loading and preprocessing the data
 
+### 1. Load the data
 
+```{r load, echo=TRUE}
+
+# unzip data file and read in csv file
+activity <- read.csv(unz("activity.zip", "activity.csv"),
+                    sep = ",", na.strings = "NA")
+
+```
+
+### 2. Process/transform data as needed for analysis
+
+```{r format, echo=TRUE}
+# convert date values from Factor variables to Date variables
+activity$date <- as.Date(activity$date, format = "%Y-%m-%d")
+
+```
 
 ## What is mean total number of steps taken per day?
 
+### 1. Make a histogram of the toal number of steps taken each day
 
+```{r stepssum, echo=TRUE}
+
+# calculate total steps per day
+byday.sum <- aggregate(activity$steps,by=list(activity$date),FUN = sum, na.rm = TRUE)
+names(byday.sum) <- c("days", "sum")
+
+# create histogram representing total steps per day
+hist(x = byday.sum$sum, xlab = "Total Steps per day", main = NULL)
+
+```
+
+### 2. Calculate and report the mean and median total number of steps taken per day
+
+```{r stepsmeanmedian, echo=TRUE}
+
+# calculate mean steps per day
+byday.mean <- aggregate(activity$steps,by=list(activity$date),FUN = mean, na.rm = TRUE)
+names(byday.mean) <- c("days", "mean")
+
+# calculate median steps per day
+byday.median <- aggregate(activity$steps,by=list(activity$date), FUN = median, na.rm = TRUE)
+names(byday.median) <- c("days", "median")
+
+# present means and medians per day
+byday.mean
+byday.median
+```
 
 ## What is the average daily activity pattern?
 
+### 1. Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
 
+```{r pattern, echo=TRUE}
+
+# calculate mean steps per interval
+byinterval.mean <- aggregate(activity$steps,by=list(activity$interval),FUN = mean, na.rm = TRUE)
+names(byinterval.mean) <- c("interval", "mean")
+
+# create time series plot of mean steps per interval across all days
+plot(x = byinterval.mean$interval, y = byinterval.mean$mean, type = "l",
+     xlab = "Interval", ylab = "Mean steps")
+
+```
+
+### 2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+```{r maxsteps, echo=TRUE}
+
+# determine, and report, which 5-minute interval contains most steps, on average, per day
+byinterval.mean$interval[byinterval.mean$mean == max(byinterval.mean$mean)]
+
+```
 
 ## Imputing missing values
 
+### 1. Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
 
+```{r missing, echo=TRUE}
+
+# calculate and report missing values
+sum(is.na(activity$steps))
+
+```
+
+### 2. Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc
+
+Method selected is substituion with mean of specified interval.
+
+### 3. Create a new dataset that is equal to the original dataset but with the missing data filled in.
+
+```{r missingsub, echo=TRUE}
+# create new data set with NAs substitutued by average for interval
+substituded <- activity
+for(i in 1:nrow(substituded))
+{
+  if(is.na(substituded$steps[i]))
+  {
+    substituded$steps[i] <-
+      byinterval.mean$mean[which(byinterval.mean$interval == substituded$interval[i])]
+  }
+}
+
+```
+
+### 4. Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+The reports differ. Impact includes shifting daily means towards interval means as well as mischaracterizing median value (median steps non-zero for days with substituted values)
+
+```{r compare, echo=TRUE}
+
+# calculate mean steps by date
+substituded.mean <- aggregate(substituded$steps,by=list(substituded$date),FUN = mean, na.rm = TRUE)
+names(substituded.mean) <- c("days", "mean")
+
+# calculate median steps by date
+substituded.median <- aggregate(substituded$steps,by=list(substituded$date), FUN = median, na.rm = TRUE)
+names(substituded.median) <- c("days", "median")
+
+#create histogram for mean steps per day
+hist(x = substituded.mean$mean, xlab = "Mean steps per day", main = NULL)
+
+# report means and median of steps per day
+substituded.mean
+substituded.median
+
+```
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+### 1. Create a new factor variable in the dataset with two levels -- "weekday" and "weekend" indicating whether a given date is a weekday or weekend day.
+
+```{r daytype, echo=TRUE}
+
+# first create new column containing information on day of the week
+substituded$daytype <- weekdays(substituded$date)
+
+# convert days of the week into weekend or weekday classification
+for(i in 1:nrow(substituded))
+{
+  if(substituded$daytype[i] == "Sunday" | substituded$daytype[i] == "Saturday")
+  {
+    substituded$daytype[i] <- "weekend"
+  }
+  else
+  {
+    substituded$daytype[i] <- "weekday"
+  }
+}
+
+# convert column to factor
+substituded$daytype <- as.factor(substituded$daytype)
+
+```
+
+### 2. Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis).
+
+```{r daytypeplot, echo=TRUE}
+
+# calculate mean steps per interval
+byinterval.mean <- aggregate(substituded$steps,by=list(substituded$interval, substituded$daytype),FUN = mean, na.rm = TRUE)
+names(byinterval.mean) <- c("interval", "daytype", "mean")
+
+# create time series plot showing average steps per interval for weekends and weekdays
+xyplot(byinterval.mean$mean ~ byinterval.mean$interval | byinterval.mean$daytype, layout = c(1, 2), type = "l",
+       xlab = "Interval", ylab = "Number of steps")
+
+```
+
